@@ -135,6 +135,83 @@ func TestStripStackFramePrefixesMakesPathsRelative(t *testing.T) {
 	}
 }
 
+func TestResolveStackFrameOptionsDefaultsToMainModule(t *testing.T) {
+	module := MainModulePath()
+	if module == "" {
+		t.Skip("main module path unavailable in this build")
+	}
+	got := ResolveStackFrameOptions(StackFrameOptions{})
+	if len(got.IncludePrefixes) != 1 || got.IncludePrefixes[0] != module {
+		t.Fatalf("IncludePrefixes = %#v, want [%q]", got.IncludePrefixes, module)
+	}
+}
+
+func TestResolveStackFrameOptionsKeepsExplicitPrefixes(t *testing.T) {
+	got := ResolveStackFrameOptions(StackFrameOptions{
+		IncludePrefixes: []string{"internal/"},
+	})
+	if len(got.IncludePrefixes) != 1 || got.IncludePrefixes[0] != "internal/" {
+		t.Fatalf("IncludePrefixes = %#v", got.IncludePrefixes)
+	}
+}
+
+func TestPrepareStackFramesFiltersAndTruncates(t *testing.T) {
+	frames := []StackFrame{
+		{File: "/app/internal/repo.go", Line: 1, Function: "github.com/acme/svc/internal/repo.List"},
+		{File: "/mod/github.com/gofiber/fiber/v3/router.go", Line: 2, Function: "github.com/gofiber/fiber/v3.(*App).next"},
+		{File: "/app/internal/svc.go", Line: 3, Function: "github.com/acme/svc/internal/svc.List"},
+	}
+	got := PrepareStackFrames(frames, StackFrameOptions{
+		IncludePrefixes: []string{"github.com/acme/svc/"},
+		StripPrefixes:   []string{"/app/"},
+		MaxDepth:        1,
+	})
+	if len(got) != 1 {
+		t.Fatalf("got %#v", got)
+	}
+	if got[0].File != "internal/repo.go" || got[0].Line != 1 {
+		t.Fatalf("unexpected frame %#v", got[0])
+	}
+}
+
+func TestPrepareStackFramesFallsBackWhenFilterMisses(t *testing.T) {
+	frames := []StackFrame{
+		{File: "a.go", Line: 1, Function: "pkg.A"},
+	}
+	got := PrepareStackFrames(frames, StackFrameOptions{
+		IncludePrefixes: []string{"no/match"},
+	})
+	if len(got) != 1 || got[0].Function != "pkg.A" {
+		t.Fatalf("expected fallback to original frames, got %#v", got)
+	}
+}
+
+func TestAppStackTraceLines(t *testing.T) {
+	err := Internal("failed", errors.New("boom"), nil)
+	lines := AppStackTraceLines(err, StackFrameOptions{})
+	if len(lines) == 0 {
+		t.Fatal("expected non-empty app stack lines")
+	}
+	joined := strings.Join(lines, "\n")
+	if !strings.Contains(joined, "error_test.go") {
+		t.Fatalf("lines = %#v, want error_test.go frame", lines)
+	}
+	if got := AppStackTraceString(err, StackFrameOptions{}); got != joined {
+		t.Fatalf("AppStackTraceString = %q, want joined lines %q", got, joined)
+	}
+}
+
+func TestAppStackTraceString(t *testing.T) {
+	err := Internal("failed", errors.New("boom"), nil)
+	stack := AppStackTraceString(err, StackFrameOptions{})
+	if strings.TrimSpace(stack) == "" {
+		t.Fatal("expected non-empty app stack")
+	}
+	if !strings.Contains(stack, "error_test.go") {
+		t.Fatalf("stack = %q, want error_test.go frame", stack)
+	}
+}
+
 func TestStackFramesProvideChainDerivedFramesForWrappedError(t *testing.T) {
 	base := Internal("logging scenario failed", errors.New("logging scenario database timeout"), nil)
 	level1 := Wrap(base, "failed to execute logging scenario")

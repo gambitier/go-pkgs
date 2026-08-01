@@ -331,17 +331,100 @@ func FormatStackFrame(frame StackFrame) string {
 	return fmt.Sprintf("%s:%d %s", filepath.ToSlash(frame.File), frame.Line, frame.Function)
 }
 
-// StackTraceString returns a formatted multiline stack for logging.
-func StackTraceString(err error) string {
-	frames := StackFrames(err)
+// StackFrameOptions controls filtering when formatting stacks for application logs.
+type StackFrameOptions struct {
+	IncludePrefixes []string
+	StripPrefixes   []string
+	MaxDepth        int
+}
+
+// MainModulePath returns the main module path from build info, or "".
+// Used as the default IncludePrefixes value so services do not hardcode their module path.
+func MainModulePath() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+	path := strings.TrimSpace(info.Main.Path)
+	if path == "" || path == "command-line-arguments" {
+		return ""
+	}
+	return path
+}
+
+// ResolveStackFrameOptions fills empty IncludePrefixes with MainModulePath.
+func ResolveStackFrameOptions(opts StackFrameOptions) StackFrameOptions {
+	if len(opts.IncludePrefixes) == 0 {
+		if module := MainModulePath(); module != "" {
+			opts.IncludePrefixes = []string{module}
+		}
+	}
+	return opts
+}
+
+// PrepareStackFrames filters, strips, and truncates frames for logging.
+// When IncludePrefixes is empty it defaults to the main module path.
+// If filtering matches nothing, the original frames are kept.
+func PrepareStackFrames(frames []StackFrame, opts StackFrameOptions) []StackFrame {
+	if len(frames) == 0 {
+		return nil
+	}
+	opts = ResolveStackFrameOptions(opts)
+	out := frames
+	if len(opts.IncludePrefixes) > 0 {
+		if filtered := FilterStackFrames(frames, opts.IncludePrefixes); len(filtered) > 0 {
+			out = filtered
+		}
+	}
+	if len(opts.StripPrefixes) > 0 {
+		out = StripStackFramePrefixes(out, opts.StripPrefixes)
+	}
+	if opts.MaxDepth > 0 && len(out) > opts.MaxDepth {
+		out = out[:opts.MaxDepth]
+	}
+	return out
+}
+
+// FormatStackFrames joins frames into a multiline stack string.
+func FormatStackFrames(frames []StackFrame) string {
 	if len(frames) == 0 {
 		return ""
 	}
 	lines := make([]string, 0, len(frames))
 	for _, frame := range frames {
-		lines = append(lines, FormatStackFrame(frame))
+		if line := FormatStackFrame(frame); line != "" {
+			lines = append(lines, line)
+		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// StackTraceString returns a formatted multiline stack for logging (unfiltered).
+func StackTraceString(err error) string {
+	return FormatStackFrames(StackFrames(err))
+}
+
+// AppStackTraceLines returns filtered stack frames as individual log lines.
+// Empty IncludePrefixes defaults to MainModulePath so forked services inherit the
+// current module without hardcoding it.
+func AppStackTraceLines(err error, opts StackFrameOptions) []string {
+	frames := PrepareStackFrames(StackFrames(err), opts)
+	if len(frames) == 0 {
+		return nil
+	}
+	lines := make([]string, 0, len(frames))
+	for _, frame := range frames {
+		if line := FormatStackFrame(frame); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+// AppStackTraceString returns a multiline stack filtered for application logging.
+// Prefer AppStackTraceLines when logging structured JSON fields.
+func AppStackTraceString(err error, opts StackFrameOptions) string {
+	return strings.Join(AppStackTraceLines(err, opts), "\n")
 }
 
 func stackCarrier(err error) error {
