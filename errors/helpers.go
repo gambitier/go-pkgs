@@ -1,6 +1,6 @@
-package domainerr
+package errors
 
-import "errors"
+import stderrors "errors"
 
 // Use this when you have an error to wrap and fields to add
 func InvalidArgument(message string, err error, fields map[string]any) *Error {
@@ -86,12 +86,12 @@ func Is(err error, code Code) bool {
 }
 
 // IsCode checks if an error in the chain is a domain error with the given code.
-// This also supports errors.Is when target is a *domainerr.Error carrying only Code.
+// This also supports stderrors.Is when target is a *Error carrying only Code.
 func IsCode(err error, code Code) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, &Error{Code: code}) || Is(err, code)
+	return stderrors.Is(err, &Error{Code: code}) || Is(err, code)
 }
 
 func CodeOf(err error) Code {

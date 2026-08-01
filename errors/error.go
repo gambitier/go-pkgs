@@ -1,7 +1,7 @@
-package domainerr
+package errors
 
 import (
-	"errors"
+	stderrors "errors"
 	"fmt"
 	"path/filepath"
 	"runtime/debug"
@@ -70,7 +70,7 @@ func wrapErrWithStack(err error) error {
 // As returns the first *Error in the chain.
 func As(err error) (*Error, bool) {
 	var ue *Error
-	if errors.As(err, &ue) && ue != nil {
+	if stderrors.As(err, &ue) && ue != nil {
 		return ue, true
 	}
 	return nil, false
@@ -117,7 +117,7 @@ func CauseChain(err error) string {
 			err = next
 			continue
 		}
-		err = errors.Unwrap(err)
+		err = stderrors.Unwrap(err)
 	}
 	return strings.Join(parts, ": ")
 }
@@ -139,7 +139,7 @@ func ErrorContext(err error) string {
 	for err != nil {
 		next := cerrors.Unwrap(err)
 		if next == nil {
-			next = errors.Unwrap(err)
+			next = stderrors.Unwrap(err)
 		}
 		if next != nil {
 			for _, segment := range contextSegments(err.Error(), domainMessage, leafMessage) {
@@ -226,7 +226,7 @@ func StackFrames(err error) []StackFrame {
 		carriers = append(carriers, stackCarrier(current))
 		next := cerrors.Unwrap(current)
 		if next == nil {
-			next = errors.Unwrap(current)
+			next = stderrors.Unwrap(current)
 		}
 		current = next
 	}
@@ -402,7 +402,7 @@ func deepestLeafMessage(err error, domainMessage string) string {
 			err = next
 			continue
 		}
-		err = errors.Unwrap(err)
+		err = stderrors.Unwrap(err)
 	}
 	return last
 }

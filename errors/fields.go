@@ -1,7 +1,7 @@
-package domainerr
+package errors
 
 import (
-	"errors"
+	stderrors "errors"
 
 	cerrors "github.com/cockroachdb/errors"
 )
@@ -43,7 +43,7 @@ func domainErrorsInChain(err error) []*Error {
 		}
 		next := cerrors.Unwrap(current)
 		if next == nil {
-			next = errors.Unwrap(current)
+			next = stderrors.Unwrap(current)
 		}
 		current = next
 	}
@@ -64,7 +64,7 @@ func domainErrorAt(err error) (*Error, bool) {
 		return fe.value, true
 	}
 	var fe *fluentError
-	if errors.As(err, &fe) && fe != nil && fe.value != nil {
+	if stderrors.As(err, &fe) && fe != nil && fe.value != nil {
 		return fe.value, true
 	}
 	return nil, false

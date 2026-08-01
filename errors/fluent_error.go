@@ -1,4 +1,4 @@
-package domainerr
+package errors
 
 type FluentError interface {
 	error
@@ -38,7 +38,7 @@ func (b *fluentError) Error() string {
 	return b.value.Error()
 }
 
-// Unwrap exposes the inner *Error so errors.As / domainerr.As can locate it
+// Unwrap exposes the inner *Error so errors.As / As can locate it
 // and surface the correct Code/Message to HTTP adapters.
 func (b *fluentError) Unwrap() error {
 	if b == nil {

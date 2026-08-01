@@ -1,4 +1,4 @@
-package domainerr
+package errors
 
 // Code is a stable, client-facing error code.
 // It must not change once published (treat as API contract).

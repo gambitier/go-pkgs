@@ -1,16 +1,16 @@
-package httpstatus
+package apiresponse
 
 import (
 	"net/http"
 	"testing"
 
-	"github.com/gambitier/go-pkgs/errors/domainerr"
+	pkgerrors "github.com/gambitier/go-pkgs/errors"
 )
 
 func TestCodeFromHTTPStatus_neverInternalFor4xx(t *testing.T) {
 	for status := 400; status < 500; status++ {
 		code := CodeFromHTTPStatus(status)
-		if code == domainerr.CodeInternal {
+		if code == pkgerrors.CodeInternal {
 			t.Fatalf("status %d mapped to INTERNAL", status)
 		}
 	}
@@ -29,19 +29,9 @@ func TestStatusFromCode_roundTrip(t *testing.T) {
 	}
 }
 
-func TestMethodNotAllowedMapping(t *testing.T) {
-	code := CodeFromHTTPStatus(http.StatusMethodNotAllowed)
-	if code != domainerr.CodeMethodNotAllowed {
-		t.Fatalf("expected METHOD_NOT_ALLOWED, got %s", code)
-	}
-	if StatusFromCode(code) != http.StatusMethodNotAllowed {
-		t.Fatalf("expected status 405, got %d", StatusFromCode(code))
-	}
-}
-
 func TestToDomainError_methodNotAllowed(t *testing.T) {
 	err := ToDomainError(http.StatusMethodNotAllowed, "Method Not Allowed", nil)
-	if err.Code != domainerr.CodeMethodNotAllowed {
+	if err.Code != pkgerrors.CodeMethodNotAllowed {
 		t.Fatalf("expected METHOD_NOT_ALLOWED, got %s", err.Code)
 	}
 	if err.Message != "Method Not Allowed" {
@@ -58,14 +48,14 @@ func TestToDomainError_emptyMessageUsesStatusText(t *testing.T) {
 
 func TestCodeFromHTTPStatus_unknown5xxIsInternal(t *testing.T) {
 	code := CodeFromHTTPStatus(599)
-	if code != domainerr.CodeInternal {
+	if code != pkgerrors.CodeInternal {
 		t.Fatalf("expected INTERNAL for unknown 5xx, got %s", code)
 	}
 }
 
 func TestCodeFromHTTPStatus_unknown4xxIsInvalidArgument(t *testing.T) {
 	code := CodeFromHTTPStatus(499)
-	if code != domainerr.CodeInvalidArgument {
+	if code != pkgerrors.CodeInvalidArgument {
 		t.Fatalf("expected INVALID_ARGUMENT for unknown 4xx, got %s", code)
 	}
 }
