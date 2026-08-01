@@ -7,6 +7,8 @@ github.com/cockroachdb/redact v1.1.8/go.mod h1:GceHHpJ0rMDpYARL5In88Alq/xMBUtVlz
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/gambitier/go-pkgs/errors v0.2.0 h1:v3f6FM7fultJvlU38M7n7vvw3lBpCT2jOdjcW0/8V8Q=
+github.com/gambitier/go-pkgs/errors v0.2.0/go.mod h1:T5bHpz+fsfGOn+go2Fpeu7TE4lLBnUB0gD2VgJ4GpVc=
 github.com/getsentry/sentry-go v0.45.1 h1:9rfzJtGiJG+MGIaWZXidDGHcH5GU1Z5y0WVJGf9nysw=
 github.com/getsentry/sentry-go v0.45.1/go.mod h1:XDotiNZbgf5U8bPDUAfvcFmOnMQQceESxyKaObSssW0=
 github.com/go-errors/errors v1.4.2 h1:J6MZopCL4uSllY1OfXM374weqZFFItUbrImctkmUxIA=
