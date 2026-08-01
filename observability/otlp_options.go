@@ -8,7 +8,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 )
 
-func signalClientOptions(cfg Config, signalEndpoint string) []otlptracegrpc.Option {
+func signalClientOptions(cfg runtimeConfig, signalEndpoint string) []otlptracegrpc.Option {
 	endpoint := endpointOrDefault(signalEndpoint, cfg.Endpoint)
 	opts := []otlptracegrpc.Option{}
 	if endpoint != "" {
@@ -23,7 +23,7 @@ func signalClientOptions(cfg Config, signalEndpoint string) []otlptracegrpc.Opti
 	return opts
 }
 
-func signalMetricClientOptions(cfg Config, signalEndpoint string) []otlpmetricgrpc.Option {
+func signalMetricClientOptions(cfg runtimeConfig, signalEndpoint string) []otlpmetricgrpc.Option {
 	endpoint := endpointOrDefault(signalEndpoint, cfg.Endpoint)
 	opts := []otlpmetricgrpc.Option{}
 	if endpoint != "" {
@@ -38,7 +38,7 @@ func signalMetricClientOptions(cfg Config, signalEndpoint string) []otlpmetricgr
 	return opts
 }
 
-func signalLogClientOptions(cfg Config, signalEndpoint string) []otlploggrpc.Option {
+func signalLogClientOptions(cfg runtimeConfig, signalEndpoint string) []otlploggrpc.Option {
 	endpoint := endpointOrDefault(signalEndpoint, cfg.Endpoint)
 	opts := []otlploggrpc.Option{}
 	if endpoint != "" {

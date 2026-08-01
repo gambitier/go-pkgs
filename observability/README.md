@@ -1,22 +1,22 @@
 # observability
 
-OpenTelemetry setup for traces, metrics, and logs (OTLP/gRPC), plus Fiber and gorilla/mux helpers.
+OpenTelemetry setup for traces, metrics, and logs (OTLP/gRPC), plus stdlib HTTP and gRPC helpers.
 
 ## What / why
 
 Use this package when you want:
 
-- YAML-driven OTLP exporters without scattering SDK setup
+- Shared OTLP SDK bootstrap without scattering provider setup
 - HTTP/gRPC instrumentation with health/swagger path filters
 - Optional logrus → OTLP log bridge via a small `Logger` interface
 
-Advantages vs copy-pasting otel SDK init: one config shape, shared middleware, and a disable-by-default path when `opentel` is absent.
+This package does **not** load config (YAML/JSON/env/viper). The service builds a `Config` and passes it to `Init`.
 
 ## Install
 
 ```bash
 export GOPRIVATE=github.com/gambitier/*
-go get github.com/gambitier/go-pkgs/observability@v0.1.0
+go get github.com/gambitier/go-pkgs/observability@v0.2.0
 ```
 
 ## Usage
@@ -24,11 +24,18 @@ go get github.com/gambitier/go-pkgs/observability@v0.1.0
 ```go
 import commonobservability "github.com/gambitier/go-pkgs/observability"
 
-cfg, err := commonobservability.InitConfig("golang-service-template")
+cfg := commonobservability.Config{
+  Enabled:      true,
+  ServiceName:  "golang-service-template",
+  CollectorURL: "localhost:4317",
+  Insecure:     true,
+  Sampling:     commonobservability.SamplingConfig{Ratio: 1.0},
+}
 shutdown, err := commonobservability.Init(ctx, cfg, otelLogger) // otelLogger may be nil
 defer shutdown(context.Background())
 
-app.Use(commonobservability.FiberMiddleware("golang-service-template-http"))
+// Framework middleware (e.g. Fiber) belongs in the consuming service.
+handler = commonobservability.WrapHTTPHandler("my-service-http", handler)
 ```
 
 `Logger` interface (package-local — not the logging module):
@@ -44,20 +51,18 @@ Adapt your app logger in `internal/platform`.
 
 ## Config
 
-```yaml
-opentel:
-  enabled: false
-  collector_url: "localhost:4317"
-  service_name: "golang-service-template"
-  insecure: true
-  sampling:
-    ratio: 1.0
-  resource:
-    deployment_environment: "development"
-    service_version: "1.0.0"
-```
+`Config` fields the caller fills (names are hints for mapstructure-style unmarshaling in the service, not a loader):
 
-Exporter endpoints come from YAML only (`collector_url`, optional per-signal endpoints). `OTEL_*` env vars do not override exporters. Missing `opentel` section ⇒ telemetry disabled.
+| Field | Purpose |
+|-------|---------|
+| `Enabled` | When false, `Init` is a no-op |
+| `CollectorURL` | Default OTLP/gRPC endpoint |
+| `TracesURL` / `MetricsURL` / `LogsURL` | Optional per-signal overrides |
+| `ServiceName` | Resource `service.name` |
+| `Insecure` / `InsecureMode` | TLS off for exporters (`InsecureMode` is legacy string) |
+| `Sampling.Ratio` | Trace head sampling (clamped to `(0,1]`; default 1.0) |
+| `Resource.*` | Extra resource attributes |
+| `Headers` | OTLP headers |
 
 ## Important notes
 
@@ -67,4 +72,4 @@ Exporter endpoints come from YAML only (`collector_url`, optional per-signal end
 
 ## Composition
 
-Build logger + call `Init` + register Fiber middleware from the consuming service’s `internal/platform` / `main`.
+Service loads its own config → builds `observability.Config` → `Init`. Register HTTP framework middleware (Fiber, etc.) in the service.

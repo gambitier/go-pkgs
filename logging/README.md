@@ -10,13 +10,13 @@ Use this package when you want:
 - JSON/text format, level config, console/file sinks
 - Correlation ID and optional trace fields on context-scoped loggers
 
-Advantages vs raw logrus in every service: consistent config loading, sink wiring, and field conventions.
+This package does **not** load config (YAML/JSON/env/viper). The service builds a `Config` and passes it to `New`.
 
 ## Install
 
 ```bash
 export GOPRIVATE=github.com/gambitier/*
-go get github.com/gambitier/go-pkgs/logging@v0.1.0
+go get github.com/gambitier/go-pkgs/logging@v0.2.0
 ```
 
 ## Usage
@@ -37,17 +37,7 @@ logger.Error("request failed", err, logging.Fields{"path": "/items"})
 
 ## Config
 
-Viper-friendly via `logging.InitConfig` / `logging.Config` (level, format, service_name, sinks). Typical YAML:
-
-```yaml
-logging:
-  level: info
-  format: json
-  service_name: golang-service-template
-  sinks:
-    - type: console
-      enabled: true
-```
+Caller fills `logging.Config` (level, format, service_name, sinks, …). Optional `mapstructure` tags exist for service-side unmarshaling only.
 
 ## Important notes
 

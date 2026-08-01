@@ -1,25 +1,23 @@
 package commonobservability
 
 import (
-	"fmt"
 	"strings"
-
-	"github.com/spf13/viper"
 )
 
-// YAMLConfig is the opentel block in service config files (YAML-only; no OTEL_* env overrides).
-type YAMLConfig struct {
-	Enabled       bool            `mapstructure:"enabled"`
-	CollectorURL  string          `mapstructure:"collector_url"`
-	ServiceName   string          `mapstructure:"service_name"`
-	Insecure      bool            `mapstructure:"insecure"`
-	InsecureMode  string          `mapstructure:"insecure_mode"` // legacy string "true"/"false"
-	Sampling      SamplingConfig  `mapstructure:"sampling"`
-	Resource      ResourceConfig  `mapstructure:"resource"`
-	TracesURL     string          `mapstructure:"traces_endpoint"`
-	MetricsURL    string          `mapstructure:"metrics_endpoint"`
-	LogsURL       string          `mapstructure:"logs_endpoint"`
-	Headers       map[string]string `mapstructure:"headers"`
+// Config is the observability settings the caller builds (from any source) and
+// passes to Init. This package does not load config files or environment.
+type Config struct {
+	Enabled      bool              `mapstructure:"enabled"`
+	CollectorURL string            `mapstructure:"collector_url"`
+	ServiceName  string            `mapstructure:"service_name"`
+	Insecure     bool              `mapstructure:"insecure"`
+	InsecureMode string            `mapstructure:"insecure_mode"` // legacy string "true"/"false"
+	Sampling     SamplingConfig    `mapstructure:"sampling"`
+	Resource     ResourceConfig    `mapstructure:"resource"`
+	TracesURL    string            `mapstructure:"traces_endpoint"`
+	MetricsURL   string            `mapstructure:"metrics_endpoint"`
+	LogsURL      string            `mapstructure:"logs_endpoint"`
+	Headers      map[string]string `mapstructure:"headers"`
 }
 
 // SamplingConfig controls trace head sampling.
@@ -33,8 +31,8 @@ type ResourceConfig struct {
 	ServiceVersion        string `mapstructure:"service_version"`
 }
 
-// Config is the normalized runtime observability configuration.
-type Config struct {
+// runtimeConfig is the normalized shape used inside Init and exporters.
+type runtimeConfig struct {
 	ServiceName string
 	Enabled     bool
 
@@ -52,39 +50,15 @@ type Config struct {
 	ServiceVersion        string
 }
 
-// InitConfig reads the opentel section from viper. When the section is missing, telemetry is disabled.
-func InitConfig(serviceName string) (Config, error) {
-	cfg := Config{
-		ServiceName:   strings.TrimSpace(serviceName),
-		Enabled:       false,
-		SamplingRatio: 1.0,
+func normalize(cfg Config) runtimeConfig {
+	serviceName := strings.TrimSpace(cfg.ServiceName)
+
+	insecure := cfg.Insecure
+	if strings.TrimSpace(cfg.InsecureMode) != "" {
+		insecure = parseBoolString(cfg.InsecureMode, insecure)
 	}
 
-	subv := viper.Sub("opentel")
-	if subv == nil {
-		return cfg, nil
-	}
-
-	var yamlCfg YAMLConfig
-	if err := subv.Unmarshal(&yamlCfg); err != nil {
-		return Config{}, fmt.Errorf("unmarshal opentel config: %w", err)
-	}
-
-	return normalizeConfig(cfg.ServiceName, yamlCfg), nil
-}
-
-func normalizeConfig(fallbackServiceName string, yamlCfg YAMLConfig) Config {
-	serviceName := strings.TrimSpace(yamlCfg.ServiceName)
-	if serviceName == "" {
-		serviceName = strings.TrimSpace(fallbackServiceName)
-	}
-
-	insecure := yamlCfg.Insecure
-	if strings.TrimSpace(yamlCfg.InsecureMode) != "" {
-		insecure = parseBoolString(yamlCfg.InsecureMode, insecure)
-	}
-
-	ratio := yamlCfg.Sampling.Ratio
+	ratio := cfg.Sampling.Ratio
 	if ratio <= 0 {
 		ratio = 1.0
 	}
@@ -92,23 +66,23 @@ func normalizeConfig(fallbackServiceName string, yamlCfg YAMLConfig) Config {
 		ratio = 1.0
 	}
 
-	headers := yamlCfg.Headers
+	headers := cfg.Headers
 	if headers == nil {
 		headers = map[string]string{}
 	}
 
-	return Config{
+	return runtimeConfig{
 		ServiceName:           serviceName,
-		Enabled:               yamlCfg.Enabled,
-		Endpoint:              strings.TrimSpace(yamlCfg.CollectorURL),
+		Enabled:               cfg.Enabled,
+		Endpoint:              strings.TrimSpace(cfg.CollectorURL),
 		Headers:               headers,
 		Insecure:              insecure,
-		TracesEndpoint:        strings.TrimSpace(yamlCfg.TracesURL),
-		MetricsEndpoint:       strings.TrimSpace(yamlCfg.MetricsURL),
-		LogsEndpoint:          strings.TrimSpace(yamlCfg.LogsURL),
+		TracesEndpoint:        strings.TrimSpace(cfg.TracesURL),
+		MetricsEndpoint:       strings.TrimSpace(cfg.MetricsURL),
+		LogsEndpoint:          strings.TrimSpace(cfg.LogsURL),
 		SamplingRatio:         ratio,
-		DeploymentEnvironment: strings.TrimSpace(yamlCfg.Resource.DeploymentEnvironment),
-		ServiceVersion:        strings.TrimSpace(yamlCfg.Resource.ServiceVersion),
+		DeploymentEnvironment: strings.TrimSpace(cfg.Resource.DeploymentEnvironment),
+		ServiceVersion:        strings.TrimSpace(cfg.Resource.ServiceVersion),
 	}
 }
 

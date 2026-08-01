@@ -35,10 +35,12 @@ type Logger interface {
 	Warn(message string, fields map[string]any)
 }
 
-// Init configures global OpenTelemetry providers. Pass nil logger to skip the
-// logrus OTLP bridge and runtime-metric warnings.
+// Init configures global OpenTelemetry providers from cfg. Pass nil logger to
+// skip the logrus OTLP bridge and runtime-metric warnings. Defaults (sampling
+// ratio, insecure_mode, empty headers) are applied inside Init.
 func Init(ctx context.Context, cfg Config, logger Logger) (func(context.Context) error, error) {
-	if !cfg.Enabled {
+	rc := normalize(cfg)
+	if !rc.Enabled {
 		telemetryEnabled.Store(false)
 		return func(context.Context) error { return nil }, nil
 	}
@@ -46,25 +48,25 @@ func Init(ctx context.Context, cfg Config, logger Logger) (func(context.Context)
 	initCtx, cancel := context.WithTimeout(ctx, initTimeout)
 	defer cancel()
 
-	res, err := buildResource(initCtx, cfg)
+	res, err := buildResource(initCtx, rc)
 	if err != nil {
 		return nil, fmt.Errorf("create otel resource: %w", err)
 	}
 
-	traceExporter, err := otlptracegrpc.New(initCtx, traceClientOptions(cfg)...)
+	traceExporter, err := otlptracegrpc.New(initCtx, traceClientOptions(rc)...)
 	if err != nil {
 		return nil, fmt.Errorf("create trace exporter: %w", err)
 	}
-	meterExporter, err := otlpmetricgrpc.New(initCtx, metricClientOptions(cfg)...)
+	meterExporter, err := otlpmetricgrpc.New(initCtx, metricClientOptions(rc)...)
 	if err != nil {
 		return nil, fmt.Errorf("create metric exporter: %w", err)
 	}
-	logExporter, err := otlploggrpc.New(initCtx, logClientOptions(cfg)...)
+	logExporter, err := otlploggrpc.New(initCtx, logClientOptions(rc)...)
 	if err != nil {
 		return nil, fmt.Errorf("create log exporter: %w", err)
 	}
 
-	sampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(cfg.SamplingRatio))
+	sampler := sdktrace.ParentBased(sdktrace.TraceIDRatioBased(rc.SamplingRatio))
 
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithSampler(sampler),
@@ -91,7 +93,7 @@ func Init(ctx context.Context, cfg Config, logger Logger) (func(context.Context)
 
 	if logger != nil {
 		logger.AddHook(otellogrus.NewHook(
-			cfg.ServiceName,
+			rc.ServiceName,
 			otellogrus.WithLoggerProvider(loggerProvider),
 		))
 	}
@@ -120,7 +122,7 @@ func IsEnabled() bool {
 	return telemetryEnabled.Load()
 }
 
-func buildResource(ctx context.Context, cfg Config) (*resource.Resource, error) {
+func buildResource(ctx context.Context, cfg runtimeConfig) (*resource.Resource, error) {
 	attrs := []resource.Option{
 		resource.WithFromEnv(),
 		resource.WithProcess(),
@@ -138,14 +140,14 @@ func buildResource(ctx context.Context, cfg Config) (*resource.Resource, error) 
 	return resource.New(ctx, attrs...)
 }
 
-func traceClientOptions(cfg Config) []otlptracegrpc.Option {
+func traceClientOptions(cfg runtimeConfig) []otlptracegrpc.Option {
 	return signalClientOptions(cfg, cfg.TracesEndpoint)
 }
 
-func metricClientOptions(cfg Config) []otlpmetricgrpc.Option {
+func metricClientOptions(cfg runtimeConfig) []otlpmetricgrpc.Option {
 	return signalMetricClientOptions(cfg, cfg.MetricsEndpoint)
 }
 
-func logClientOptions(cfg Config) []otlploggrpc.Option {
+func logClientOptions(cfg runtimeConfig) []otlploggrpc.Option {
 	return signalLogClientOptions(cfg, cfg.LogsEndpoint)
 }
