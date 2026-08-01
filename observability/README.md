@@ -16,26 +16,26 @@ This package does **not** load config (YAML/JSON/env/viper). The service builds 
 
 ```bash
 export GOPRIVATE=github.com/gambitier/*
-go get github.com/gambitier/go-pkgs/observability@v0.2.0
+go get github.com/gambitier/go-pkgs/observability@v0.3.0
 ```
 
 ## Usage
 
 ```go
-import commonobservability "github.com/gambitier/go-pkgs/observability"
+import "github.com/gambitier/go-pkgs/observability"
 
-cfg := commonobservability.Config{
+cfg := observability.Config{
   Enabled:      true,
   ServiceName:  "golang-service-template",
   CollectorURL: "localhost:4317",
   Insecure:     true,
-  Sampling:     commonobservability.SamplingConfig{Ratio: 1.0},
+  Sampling:     observability.SamplingConfig{Ratio: 1.0},
 }
-shutdown, err := commonobservability.Init(ctx, cfg, otelLogger) // otelLogger may be nil
+shutdown, err := observability.Init(ctx, cfg, otelLogger) // otelLogger may be nil
 defer shutdown(context.Background())
 
 // Framework middleware (e.g. Fiber) belongs in the consuming service.
-handler = commonobservability.WrapHTTPHandler("my-service-http", handler)
+handler = observability.WrapHTTPHandler("my-service-http", handler)
 ```
 
 `Logger` interface (package-local — not the logging module):
@@ -59,7 +59,7 @@ Adapt your app logger in `internal/platform`.
 | `CollectorURL` | Default OTLP/gRPC endpoint |
 | `TracesURL` / `MetricsURL` / `LogsURL` | Optional per-signal overrides |
 | `ServiceName` | Resource `service.name` |
-| `Insecure` / `InsecureMode` | TLS off for exporters (`InsecureMode` is legacy string) |
+| `Insecure` | bool; TLS off for exporters when true |
 | `Sampling.Ratio` | Trace head sampling (clamped to `(0,1]`; default 1.0) |
 | `Resource.*` | Extra resource attributes |
 | `Headers` | OTLP headers |

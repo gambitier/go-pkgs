@@ -1,4 +1,4 @@
-package commonobservability
+package observability
 
 import (
 	"strings"
@@ -11,7 +11,6 @@ type Config struct {
 	CollectorURL string            `mapstructure:"collector_url"`
 	ServiceName  string            `mapstructure:"service_name"`
 	Insecure     bool              `mapstructure:"insecure"`
-	InsecureMode string            `mapstructure:"insecure_mode"` // legacy string "true"/"false"
 	Sampling     SamplingConfig    `mapstructure:"sampling"`
 	Resource     ResourceConfig    `mapstructure:"resource"`
 	TracesURL    string            `mapstructure:"traces_endpoint"`
@@ -51,13 +50,6 @@ type runtimeConfig struct {
 }
 
 func normalize(cfg Config) runtimeConfig {
-	serviceName := strings.TrimSpace(cfg.ServiceName)
-
-	insecure := cfg.Insecure
-	if strings.TrimSpace(cfg.InsecureMode) != "" {
-		insecure = parseBoolString(cfg.InsecureMode, insecure)
-	}
-
 	ratio := cfg.Sampling.Ratio
 	if ratio <= 0 {
 		ratio = 1.0
@@ -72,27 +64,16 @@ func normalize(cfg Config) runtimeConfig {
 	}
 
 	return runtimeConfig{
-		ServiceName:           serviceName,
+		ServiceName:           strings.TrimSpace(cfg.ServiceName),
 		Enabled:               cfg.Enabled,
 		Endpoint:              strings.TrimSpace(cfg.CollectorURL),
 		Headers:               headers,
-		Insecure:              insecure,
+		Insecure:              cfg.Insecure,
 		TracesEndpoint:        strings.TrimSpace(cfg.TracesURL),
 		MetricsEndpoint:       strings.TrimSpace(cfg.MetricsURL),
 		LogsEndpoint:          strings.TrimSpace(cfg.LogsURL),
 		SamplingRatio:         ratio,
 		DeploymentEnvironment: strings.TrimSpace(cfg.Resource.DeploymentEnvironment),
 		ServiceVersion:        strings.TrimSpace(cfg.Resource.ServiceVersion),
-	}
-}
-
-func parseBoolString(raw string, defaultValue bool) bool {
-	switch strings.TrimSpace(strings.ToLower(raw)) {
-	case "1", "true", "yes", "on":
-		return true
-	case "0", "false", "no", "off":
-		return false
-	default:
-		return defaultValue
 	}
 }

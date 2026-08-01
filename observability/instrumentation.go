@@ -1,4 +1,4 @@
-package commonobservability
+package observability
 
 import (
 	"fmt"

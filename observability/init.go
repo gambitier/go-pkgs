@@ -1,4 +1,4 @@
-package commonobservability
+package observability
 
 import (
 	"context"
@@ -37,7 +37,7 @@ type Logger interface {
 
 // Init configures global OpenTelemetry providers from cfg. Pass nil logger to
 // skip the logrus OTLP bridge and runtime-metric warnings. Defaults (sampling
-// ratio, insecure_mode, empty headers) are applied inside Init.
+// ratio, empty headers) are applied inside Init.
 func Init(ctx context.Context, cfg Config, logger Logger) (func(context.Context) error, error) {
 	rc := normalize(cfg)
 	if !rc.Enabled {

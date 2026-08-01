@@ -1,4 +1,4 @@
-package commonobservability
+package observability
 
 import "testing"
 
@@ -18,11 +18,11 @@ func TestNormalize_defaultsWhenDisabled(t *testing.T) {
 	}
 }
 
-func TestNormalize_samplingAndLegacyInsecureMode(t *testing.T) {
+func TestNormalize_samplingAndInsecure(t *testing.T) {
 	rc := normalize(Config{
 		Enabled:      true,
 		CollectorURL: "collector:4317",
-		InsecureMode: "true",
+		Insecure:     true,
 		Sampling:     SamplingConfig{Ratio: 0.2},
 		Resource: ResourceConfig{
 			DeploymentEnvironment: "test",
@@ -33,7 +33,7 @@ func TestNormalize_samplingAndLegacyInsecureMode(t *testing.T) {
 		t.Fatal("expected enabled=true")
 	}
 	if !rc.Insecure {
-		t.Fatal("expected insecure=true from insecure_mode")
+		t.Fatal("expected insecure=true")
 	}
 	if rc.Endpoint != "collector:4317" {
 		t.Fatalf("endpoint = %q", rc.Endpoint)
