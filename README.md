@@ -33,3 +33,12 @@ export GOPRIVATE=github.com/gambitier/*
 go get github.com/gambitier/go-pkgs/errors@v0.2.0
 go get github.com/gambitier/go-pkgs/apiresponse@v0.1.0
 ```
+
+## Make
+
+```bash
+make test   # go test in each module
+make tidy   # go mod tidy in each module
+make vet    # go vet in each module
+make check  # vet + test
+```
