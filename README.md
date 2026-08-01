@@ -40,5 +40,9 @@ go get github.com/gambitier/go-pkgs/apiresponse@v0.1.0
 make test   # go test in each module
 make tidy   # go mod tidy in each module
 make vet    # go vet in each module
+make fmt    # gofmt every module
+make hooks  # enable .githooks (runs make fmt on every commit)
 make check  # vet + test
 ```
+
+After clone, run `make hooks` once so commits auto-format via the pre-commit hook.

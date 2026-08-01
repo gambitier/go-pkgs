@@ -1,4 +1,4 @@
-.PHONY: help test tidy vet check modules
+.PHONY: help test tidy vet fmt hooks check modules
 
 MODULES := errors apiresponse logging observability
 
@@ -29,5 +29,15 @@ vet: ## Run go vet in every module
 		(cd $$m && go vet ./...) || failed=1; \
 	done; \
 	if [ $$failed -ne 0 ]; then exit 1; fi
+
+fmt: ## Format Go sources in every module (gofmt)
+	@for m in $(MODULES); do \
+		echo "==> fmt $$m"; \
+		(cd $$m && gofmt -w .); \
+	done
+
+hooks: ## Enable repo git hooks (runs make fmt on commit)
+	git config core.hooksPath .githooks
+	@echo "core.hooksPath set to .githooks"
 
 check: vet test ## Run vet + tests across all modules

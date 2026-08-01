@@ -1,0 +1,15 @@
+#!/bin/sh
+# Format Go sources before commit and re-stage any reformatted files.
+set -e
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+make fmt
+
+# Re-stage tracked .go files that fmt may have changed (including already staged ones).
+staged="$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)"
+if [ -n "$staged" ]; then
+	printf '%s\n' "$staged" | while IFS= read -r f; do
+		[ -f "$f" ] && git add -- "$f"
+	done
+fi
