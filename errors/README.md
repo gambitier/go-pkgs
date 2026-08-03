@@ -16,7 +16,7 @@ HTTP Problem Details and status mapping live in [`apiresponse`](../apiresponse) 
 
 ```bash
 export GOPRIVATE=github.com/gambitier/*
-go get github.com/gambitier/go-pkgs/errors@v0.2.0
+go get github.com/gambitier/go-pkgs/errors@v0.4.0
 ```
 
 Import path is the module root (no `domainerr` subpackage):
@@ -50,6 +50,15 @@ None.
 - Version with tags `errors/vX.Y.Z`.
 - Prefer constant messages; put dynamic values in `Fields`.
 
+## Logging
+
+`LogFields(err)` returns a typed `LogAttrs` view (cause chain, code, message, source, fields, INTERNAL stack). Call `.Map()` when merging into a logger field map. This module stays independent of `logging`.
+
+```go
+attrs := pkgerrors.LogFields(err)
+logger.Error(attrs.Message, attrs.Map())
+```
+
 ## Composition
 
-Map to HTTP with `go-pkgs/apiresponse`. Enrich logs in your app (`internal/platform`), not inside this module.
+Map to HTTP with `go-pkgs/apiresponse`. Apps can adapt `LogFields(err).Map()` into their logger field type without re-implementing enrichment.

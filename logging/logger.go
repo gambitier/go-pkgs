@@ -138,7 +138,7 @@ func (l *logrusLogger) Error(message string, err error, fields Fields) {
 }
 
 // enrichErrorLogFields adds a basic "error" field. Domain-specific enrichment
-// (codes, stacks, field maps) belongs in the consuming app's platform glue.
+// lives in go-pkgs/errors.LogFields; apps adapt via platform glue into Fields.
 func enrichErrorLogFields(fields logrusFields, err error) logrusFields {
 	if err == nil {
 		return fields

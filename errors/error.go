@@ -165,44 +165,124 @@ func RootCause(err error) string {
 	return deepestLeafMessage(err, domainMessage)
 }
 
-// LogFields returns structured attributes for logging without changing Error().
+// LogAttrs is the typed view of attributes for structured logging.
+// Use Map() when merging into a logger field map. This package does not depend on logging.
+type LogAttrs struct {
+	// Error is the preferred human-readable detail (often CauseChain).
+	Error string
+	// Cause is RootCause when it differs from Error().
+	Cause string
+	// Context is ErrorContext when non-empty.
+	Context string
+	// Code is the domain error code when err is a domain *Error.
+	Code string
+	// Message is the opaque client-safe domain message when err is a domain *Error.
+	Message string
+	// Source is OneLineSource when a stack is available.
+	Source string
+	// Fields are CollectFields domain attributes.
+	Fields map[string]any
+	// Stack is AppStackTraceLines for CodeInternal only.
+	Stack []string
+}
+
+// Empty reports whether attrs has nothing to log.
+func (a LogAttrs) Empty() bool {
+	return a.Error == "" &&
+		a.Cause == "" &&
+		a.Context == "" &&
+		a.Code == "" &&
+		a.Message == "" &&
+		a.Source == "" &&
+		len(a.Fields) == 0 &&
+		len(a.Stack) == 0
+}
+
+// Map returns logger-ready keys:
 //
-// Keys:
-//   - "error": CauseChain when it adds detail beyond Error(); otherwise Error()
-//   - "error_cause": RootCause when it differs from Error()
-//   - "error_context": ErrorContext when non-empty
+//	error, error_cause, error_context, error_code, error_msg, error_source, stack_trace
 //
-// Callers should merge these into log fields. Prefer these helpers over
-// err.Error() alone so wrapped infrastructure causes (e.g. S3 AccessDenied)
-// are not dropped when the domain message is intentionally opaque.
-func LogFields(err error) map[string]any {
-	if err == nil {
+// plus CollectFields entries. Returns nil when Empty.
+func (a LogAttrs) Map() map[string]any {
+	if a.Empty() {
 		return nil
 	}
+	out := make(map[string]any, 8+len(a.Fields))
+	if a.Error != "" {
+		out["error"] = a.Error
+	}
+	if a.Cause != "" {
+		out["error_cause"] = a.Cause
+	}
+	if a.Context != "" {
+		out["error_context"] = a.Context
+	}
+	if a.Code != "" {
+		out["error_code"] = a.Code
+	}
+	if a.Message != "" {
+		out["error_msg"] = a.Message
+	}
+	if a.Source != "" {
+		out["error_source"] = a.Source
+	}
+	for k, v := range a.Fields {
+		out[k] = v
+	}
+	if len(a.Stack) > 0 {
+		out["stack_trace"] = a.Stack
+	}
+	return out
+}
+
+// LogFields returns a typed attribute view for logging without changing Error().
+//
+// Prefer these helpers over err.Error() alone so wrapped infrastructure causes
+// (e.g. S3 AccessDenied) are not dropped when the domain message is intentionally opaque.
+// Stack traces are included only for CodeInternal.
+func LogFields(err error) LogAttrs {
+	if err == nil {
+		return LogAttrs{}
+	}
+
+	var attrs LogAttrs
 
 	public := strings.TrimSpace(err.Error())
 	chain := strings.TrimSpace(CauseChain(err))
 	cause := strings.TrimSpace(RootCause(err))
 	context := strings.TrimSpace(ErrorContext(err))
 
-	out := make(map[string]any, 3)
 	switch {
 	case chain != "" && chain != public:
-		out["error"] = chain
+		attrs.Error = chain
 	case public != "":
-		out["error"] = public
+		attrs.Error = public
 	}
-
 	if cause != "" && cause != public {
-		out["error_cause"] = cause
+		attrs.Cause = cause
 	}
 	if context != "" {
-		out["error_context"] = context
+		attrs.Context = context
 	}
-	if len(out) == 0 {
-		return nil
+
+	if src := OneLineSource(err); src != "" {
+		attrs.Source = src
 	}
-	return out
+
+	if de, ok := As(err); ok {
+		attrs.Code = string(de.Code)
+		attrs.Message = de.Message
+		if fields := CollectFields(err); len(fields) > 0 {
+			attrs.Fields = fields
+		}
+		if de.Code == CodeInternal {
+			if frames := AppStackTraceLines(err, StackFrameOptions{}); len(frames) > 0 {
+				attrs.Stack = frames
+			}
+		}
+	}
+
+	return attrs
 }
 
 // OneLineSource returns file:line function for the captured stack.

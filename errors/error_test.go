@@ -71,37 +71,90 @@ func TestLogFieldsExposesCauseChainForOpaqueDomainError(t *testing.T) {
 		nil,
 	)
 
-	fields := LogFields(err)
-	if fields["error"] == nil {
-		t.Fatalf("expected error field, got %#v", fields)
+	attrs := LogFields(err)
+	if attrs.Error == "" {
+		t.Fatalf("expected Error attr, got %#v", attrs)
 	}
-	errorValue, _ := fields["error"].(string)
-	if errorValue == "Wasabi upload failed" {
-		t.Fatalf("expected error field to include cause chain, got %q", errorValue)
+	if attrs.Error == "Wasabi upload failed" {
+		t.Fatalf("expected Error to include cause chain, got %q", attrs.Error)
 	}
-	if !strings.Contains(errorValue, "Wasabi upload failed") {
-		t.Fatalf("expected domain message in chain, got %q", errorValue)
+	if !strings.Contains(attrs.Error, "Wasabi upload failed") {
+		t.Fatalf("expected domain message in chain, got %q", attrs.Error)
 	}
-	if !strings.Contains(errorValue, "AccessDenied") {
-		t.Fatalf("expected root cause in chain, got %q", errorValue)
+	if !strings.Contains(attrs.Error, "AccessDenied") {
+		t.Fatalf("expected root cause in chain, got %q", attrs.Error)
 	}
-
-	cause, _ := fields["error_cause"].(string)
-	if !strings.Contains(cause, "AccessDenied") {
-		t.Fatalf("expected AccessDenied in error_cause, got %q", cause)
+	if !strings.Contains(attrs.Cause, "AccessDenied") {
+		t.Fatalf("expected AccessDenied in Cause, got %q", attrs.Cause)
+	}
+	if attrs.Code != string(CodeInternal) {
+		t.Fatalf("expected INTERNAL code, got %q", attrs.Code)
+	}
+	if attrs.Message != "Wasabi upload failed" {
+		t.Fatalf("expected opaque Message, got %q", attrs.Message)
+	}
+	if attrs.Source == "" || !strings.Contains(attrs.Source, ".go") {
+		t.Fatalf("expected Source with .go, got %q", attrs.Source)
+	}
+	if len(attrs.Stack) == 0 {
+		t.Fatalf("expected Stack for INTERNAL, got %#v", attrs.Stack)
 	}
 	if got := err.Error(); got != "Wasabi upload failed" {
 		t.Fatalf("Error() must stay client-safe, got %q", got)
 	}
+
+	fields := attrs.Map()
+	if fields["error"] != attrs.Error {
+		t.Fatalf("Map error = %#v, want %q", fields["error"], attrs.Error)
+	}
+	if fields["error_code"] != string(CodeInternal) {
+		t.Fatalf("Map error_code = %#v", fields["error_code"])
+	}
+	if fields["error_msg"] != "Wasabi upload failed" {
+		t.Fatalf("Map error_msg = %#v", fields["error_msg"])
+	}
 }
 
 func TestLogFieldsForPlainError(t *testing.T) {
-	fields := LogFields(errors.New("db timeout"))
+	attrs := LogFields(errors.New("db timeout"))
+	if attrs.Error != "db timeout" {
+		t.Fatalf("unexpected Error: %#v", attrs.Error)
+	}
+	if attrs.Cause != "" {
+		t.Fatalf("did not expect Cause for plain error, got %#v", attrs)
+	}
+	if attrs.Code != "" || attrs.Message != "" {
+		t.Fatalf("did not expect domain attrs for plain error, got %#v", attrs)
+	}
+	fields := attrs.Map()
 	if fields["error"] != "db timeout" {
-		t.Fatalf("unexpected error field: %#v", fields["error"])
+		t.Fatalf("unexpected Map error: %#v", fields["error"])
 	}
 	if _, ok := fields["error_cause"]; ok {
 		t.Fatalf("did not expect error_cause for plain error, got %#v", fields)
+	}
+}
+
+func TestLogFieldsNonInternalOmitsStack(t *testing.T) {
+	attrs := LogFields(InvalidArgument("name is required", errors.New("empty"), nil))
+	if attrs.Code != string(CodeInvalidArgument) {
+		t.Fatalf("Code = %q", attrs.Code)
+	}
+	if len(attrs.Stack) != 0 {
+		t.Fatalf("did not expect Stack for non-INTERNAL, got %#v", attrs.Stack)
+	}
+	if _, ok := attrs.Map()["stack_trace"]; ok {
+		t.Fatalf("did not expect stack_trace in Map")
+	}
+}
+
+func TestLogFieldsNil(t *testing.T) {
+	attrs := LogFields(nil)
+	if !attrs.Empty() {
+		t.Fatalf("expected empty attrs, got %#v", attrs)
+	}
+	if attrs.Map() != nil {
+		t.Fatalf("expected nil Map for empty attrs")
 	}
 }
 
