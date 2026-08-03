@@ -3,6 +3,8 @@ go 1.25.2
 use (
 	./apiresponse
 	./errors
+	./lifecycle
 	./logging
+	./mongodb
 	./observability
 )
