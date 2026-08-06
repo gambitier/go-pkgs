@@ -144,4 +144,6 @@ func main() {
 
 - Stdlib only (`context`, `errors`, `fmt`, `time`).
 - This package does not construct dependencies; your bootstrap creates components and passes them to `Add`.
-- Pair with `go-pkgs/mongodb` for a ready-made Mongo `Component`, or implement `Component` for HTTP, workers, caches, etc.
+- Pair with [`go-pkgs/mongodb`](../mongodb) for a ready-made Mongo `Component`, or implement `Component` for HTTP, OTel, workers, caches, etc.
+- Tags: `lifecycle/vX.Y.Z`.
+- Independent of `logging`, `errors`, and `observability`.

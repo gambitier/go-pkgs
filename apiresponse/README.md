@@ -1,16 +1,8 @@
 # apiresponse
 
-HTTP API response helpers: [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) Problem Details for errors, plus domain-code ↔ HTTP status mapping.
+Package `apiresponse` builds [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) **Problem Details** from `go-pkgs/errors` and maps domain codes ↔ HTTP status codes.
 
-## What / why
-
-Use this package when you want:
-
-- Standards-based error bodies (`application/problem+json`) instead of proprietary envelopes
-- Stable mapping between `github.com/gambitier/go-pkgs/errors` codes and HTTP status codes
-- Safe client-facing details (internal errors never leak implementation messages)
-
-Success responses are **not** wrapped: return the resource JSON directly with `Content-Type: application/json`. Correlation belongs on the **`X-Correlation-ID`** header (see `go-pkgs/logging/correlation`), not in the JSON body.
+Success responses are **not** wrapped: return the resource JSON with `Content-Type: application/json`. Correlation belongs on the **`X-Correlation-ID`** header (see `go-pkgs/logging/correlation`), not in the JSON body.
 
 ## Install
 
@@ -21,27 +13,49 @@ go get github.com/gambitier/go-pkgs/apiresponse@v0.1.0
 
 Requires `github.com/gambitier/go-pkgs/errors`.
 
-## Usage
+## When to use
+
+- Emit `application/problem+json` instead of proprietary error envelopes
+- Keep a single mapping between domain `Code` and HTTP status
+- Ensure INTERNAL errors never leak implementation messages to clients
+
+## Build a problem
 
 ```go
 import (
-  "net/http"
+    "net/http"
 
-  "github.com/gambitier/go-pkgs/apiresponse"
-  pkgerrors "github.com/gambitier/go-pkgs/errors"
+    "github.com/gambitier/go-pkgs/apiresponse"
+    pkgerrors "github.com/gambitier/go-pkgs/errors"
 )
 
 err := pkgerrors.NotFound("item not found", nil, map[string]any{"id": id})
-built := apiresponse.BuildProblem(err, apiresponse.BuildOptions{Instance: c.Path()})
+built := apiresponse.BuildProblem(err, apiresponse.BuildOptions{
+    Instance: c.Path(), // request path or URI reference
+})
 
 c.Set("Content-Type", apiresponse.ContentTypeProblemJSON)
 _ = c.Status(built.Status).JSON(built.Problem)
 
-// Success: bare resource body
+// Success: bare resource
 _ = c.Status(http.StatusOK).JSON(itemDTO)
 ```
 
-Example problem JSON:
+### `Problem` shape
+
+```go
+type Problem struct {
+    Type     string         `json:"type"`
+    Title    string         `json:"title"`
+    Status   int            `json:"status"`
+    Detail   string         `json:"detail,omitempty"`
+    Instance string         `json:"instance,omitempty"`
+    Code     string         `json:"code,omitempty"`   // extension: domain code
+    Fields   map[string]any `json:"fields,omitempty"` // extension: domain fields
+}
+```
+
+Example JSON:
 
 ```json
 {
@@ -55,18 +69,30 @@ Example problem JSON:
 }
 ```
 
-`code` and `fields` are RFC 9457 extension members for domain contracts.
+| Rule | Behavior |
+|------|----------|
+| Default `type` | `about:blank` (override via `BuildOptions.Type`) |
+| `CodeInternal` | `detail` is always `"internal server error"` — never the domain `Message` or cause |
+| Framework glue | Fiber/chi adapters live in the app (`internal/.../response`), not here |
 
-## Config
+Constants: `ContentTypeProblemJSON`, `DefaultProblemType`.
 
-None.
+## Status ↔ code
 
-## Important notes
+```go
+status := apiresponse.StatusFromCode(pkgerrors.CodeNotFound)           // 404
+code := apiresponse.CodeFromHTTPStatus(http.StatusTooManyRequests)     // RATE_LIMITED
+de := apiresponse.ToDomainError(http.StatusUnsupportedMediaType, "", cause)
+```
 
-- Independent module; depends only on `go-pkgs/errors` (not logging/observability).
-- Version with tags `apiresponse/vMAJOR.MINOR.PATCH`.
-- Default `type` is `about:blank`; register concrete problem type URIs later if needed.
+| Function | Behavior |
+|----------|----------|
+| `StatusFromCode` | Unknown code → `500` |
+| `CodeFromHTTPStatus` | Unknown 4xx → `INVALID_ARGUMENT`; else `INTERNAL` |
+| `ToDomainError` | Build `*errors.Error` from status + optional message/cause |
 
-## Composition
+## Notes
 
-Fiber (or other) adapters that set status, content type, and JSON live in the consuming app (e.g. `internal/presentation/http/response`), not in this module.
+- Depends only on `go-pkgs/errors` (not `logging` / `observability`).
+- Tags: `apiresponse/vX.Y.Z`.
+- Register concrete problem type URIs later via `BuildOptions.Type` if your API needs them.
